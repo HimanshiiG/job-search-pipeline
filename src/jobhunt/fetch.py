@@ -49,7 +49,7 @@ def _norm(source, company, title, location, remote, url, description, tags, crea
         "description": description,
         "tags": tags or [],
         "created_at": created_at,
-        "country": country.upper() if country else None,
+        "country": country.upper() if country else guess_country(location),
         "posted_at": posted_at,
         "posted_precision": posted_precision,
         "years_min": years_min,
@@ -58,6 +58,26 @@ def _norm(source, company, title, location, remote, url, description, tags, crea
         "salary": salary if salary and (salary.get("min") or salary.get("max")) else None,
         "board_url": board_url or url,   # the job board's own page (LinkedIn view URL etc.)
     }
+
+
+_COUNTRY_WORDS = {
+    "DE": "germany deutschland berlin munich münchen hamburg frankfurt cologne köln stuttgart düsseldorf leipzig",
+    "NL": "netherlands nederland amsterdam rotterdam utrecht eindhoven hague",
+    "GB": "united kingdom uk england london manchester edinburgh glasgow cambridge oxford bristol",
+    "IE": "ireland dublin cork", "AT": "austria österreich vienna wien graz", "CH": "switzerland zurich zürich geneva basel",
+    "FR": "france paris lyon", "ES": "spain barcelona madrid", "PT": "portugal lisbon lisboa porto",
+    "PL": "poland warsaw kraków krakow wrocław", "SE": "sweden stockholm", "DK": "denmark copenhagen",
+    "BE": "belgium brussels antwerp", "IN": "india bengaluru bangalore mumbai pune hyderabad gurugram chennai",
+}
+_COUNTRY_LOOKUP = {w: c for c, ws in _COUNTRY_WORDS.items() for w in ws.split()}
+
+
+def guess_country(location: str) -> str | None:
+    """Country code from free-text location ("Berlin, Germany" -> DE), for sources that send none."""
+    for w in re.findall(r"[a-zà-ÿ]+", (location or "").lower()):
+        if w in _COUNTRY_LOOKUP:
+            return _COUNTRY_LOOKUP[w]
+    return None
 
 
 def _get(url, params=None):

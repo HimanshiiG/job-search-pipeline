@@ -88,7 +88,10 @@ def build(cfg, llm: LLM, e: dict, connections: list[dict]) -> dict:
 
     known = warm_intros(e["company"], connections)
     parts = [f"# {e['title']} — {e['company']}  [{e.get('code')}]",
-             f"Match {e.get('score')}% · {e.get('location') or e.get('country')} · visa: {e.get('visa') or 'n/a (India)'}",
+             f"Match {e.get('score')}% · {e.get('location') or e.get('country')} · visa: "
+             + {"sponsors": "sponsorship offered", "register": "employer on an official sponsor register",
+                "blue-card": "EU Blue Card country (no employer licence needed)",
+                "unknown": "not stated"}.get(e.get("visa") or "", "n/a (home country)"),
              f"Apply: {e['url']}", ""]
     if warnings:
         parts += ["## ⚠ Check before sending"] + [f"- {w}" for w in warnings] + [""]

@@ -24,8 +24,9 @@ class Config:
         self.root = ROOT
         self.config_path = Path(config_path) if config_path else ROOT / "config" / "config.yaml"
         self.cfg = _read_yaml(self.config_path)
-        private = self.config_path.parent / "private.yaml"
-        if private.exists():  # personal values, decrypted from the vault in CI
+        private = next((p for p in (self.config_path.parent / "private.yaml", ROOT / "config" / "private.yaml")
+                        if p.exists()), None)
+        if private:  # personal values, decrypted from the vault in CI
             self.cfg = _merge(self.cfg, _read_yaml(private))
         profile_id = profile_override or self.cfg.get("run", {}).get("profile")
         if not profile_id:
