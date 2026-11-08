@@ -1,0 +1,113 @@
+# Scheduled job search: fetch -> filter -> score (Haiku) -> documents (Sonnet) -> newsletter.
+# claude -p bills the Claude plan via CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`);
+# ANTHROPIC_API_KEY is never set.
+#
+# This repo is public, so nothing personal may reach it in the clear:
+#   - private files (profile, resumes, project brief, private config) come from
+#     vault/private.bin, decrypted with JOBHUNT_VAULT_KEY;
+#   - state (seen jobs, ledger, replies, run logs) lives encrypted on the `jobhunt-state` branch;
+#   - the pipeline's own output goes to a log that is encrypted into the state, never to the
+#     public run log; no artifacts are uploaded (they would be public).
+#
+# Secrets: CLAUDE_CODE_OAUTH_TOKEN, JOBHUNT_SMTP_PASS, JOBHUNT_VAULT_KEY
+name: jobhunt
+
+on:
+  schedule:
+    - cron: "0 23 * * *"     # 04:30 IST: fetch + score + documents, newsletter sent at 08:00 IST
+    - cron: "30 12 * * *"    # 18:00 IST: fetch + score + documents, nothing sent
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full (sends email) | score (no email) | newsletter | fetch-only"
+        default: score
+        type: choice
+        options: [score, full, newsletter, fetch-only]
+
+permissions:
+  contents: write            # push the encrypted jobhunt-state branch
+
+concurrency:
+  group: jobhunt
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      JOBHUNT_VAULT_KEY: ${{ secrets.JOBHUNT_VAULT_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then m="${{ inputs.mode }}"; slot=$([ "$m" = full ] && echo morning || echo evening)
+          elif [ "${{ github.event.schedule }}" = "0 23 * * *" ]; then m=full; slot=morning
+          else m=score; slot=evening; fi
+          echo "mode=$m" >> "$GITHUB_OUTPUT"; echo "slot=$slot" >> "$GITHUB_OUTPUT"; echo "mode: $m ($slot)"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python deps
+        run: pip install -q -r requirements.txt
+
+      - uses: actions/setup-node@v4
+        if: steps.mode.outputs.mode != 'fetch-only'
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        if: steps.mode.outputs.mode != 'fetch-only'
+        run: npm install -g --silent @anthropic-ai/claude-code && claude --version
+
+      - name: Unseal private files
+        run: python scripts/vault.py unseal
+
+      - name: Load state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          url="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
+          if git ls-remote --exit-code --heads "$url" jobhunt-state >/dev/null; then
+            git clone -q --depth 1 --branch jobhunt-state "$url" state
+          else
+            mkdir -p state && cd state && git init -q -b jobhunt-state && git remote add origin "$url" && cd ..
+          fi
+          python scripts/vault.py unseal-state state
+
+      - name: Run pipeline (output goes to the encrypted state, not this public log)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          JOBHUNT_SMTP_PASS: ${{ secrets.JOBHUNT_SMTP_PASS }}
+          JOBHUNT_SLOT: ${{ steps.mode.outputs.slot }}
+          JOBHUNT_WAIT_FOR_SEND: ${{ steps.mode.outputs.mode == 'full' && '1' || '' }}
+        run: |
+          set +e
+          python run.py --mode "${{ steps.mode.outputs.mode }}" > "state/run-${{ steps.mode.outputs.slot }}.log.json.txt" 2>&1
+          code=$?
+          python - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("state/run-${{ steps.mode.outputs.slot }}.log.json.txt")
+          pathlib.Path("state/last_run_log.json").write_text(json.dumps({"log": p.read_text(errors="replace")[-200000:]}))
+          p.unlink()
+          PY
+          echo "pipeline exit code: $code"
+          exit $code
+
+      - name: Save state (encrypted)
+        if: always() && steps.mode.outputs.mode != 'fetch-only'
+        run: |
+          python scripts/vault.py seal-state state
+          cd state
+          git config user.name "jobhunt-bot"
+          git config user.email "jobhunt-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -q -m "state $(date -u +%F)"
+          git push -q origin HEAD:jobhunt-state

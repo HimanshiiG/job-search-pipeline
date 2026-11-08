@@ -1,0 +1,222 @@
+# Global pipeline config. Personal values (profile id, email addresses) live in
+# config/private.yaml, which is merged over this file and kept in the encrypted vault.
+# Everything the pipeline does is driven from here + profiles/<id>.yaml.
+# "keep it config driven -- job apis, and everything."
+
+run:
+  profile: candidate             # which profiles/<id>.yaml to use (set in config/private.yaml)
+  docs_threshold: 60             # documents (resume; + letter & outreach outside India) for every match >= this
+  docs_max_per_run: 80           # safety cap per run; the rest wait for the next run
+  sponsor_registers: true        # UK + NL official sponsor registers for the visa label (weekly refresh)
+  apply_threshold: 50            # tier-1 match % needed to make the newsletter
+  jd_fetch:                      # card-only jobs (LinkedIn) get their JD fetched before scoring
+    max_per_run: 400
+    pause_sec: 1.5
+  output_dir: output             # per-run artifacts land here
+  state_file: state/seen.json    # dedupe memory across runs (hash -> first_seen)
+
+# --- JOB SOURCES (add/remove freely; type selects the adapter in fetch.py) ---
+# Chosen in Phase 1 (docs/phase1-results.md). max_age_hours = keep only jobs whose REAL posting
+# date is this recent (day-precision dates get +24h slack). Undated jobs are dropped.
+sources:
+  # freehire: ~3.4M jobs crawled from company ATSs. Its company-board rows are fresh (median 2h);
+  # its aggregator rows are often undated or months late, hence posted_at filtering + undated list.
+  - name: freehire
+    type: freehire
+    enabled: true
+    category: data_engineering
+    max_age_hours: 36
+    max_per_group: 300
+    seniority_exclude: [intern, lead, staff, principal, c_level]
+    undated_sources: [whatjobs, manatal, civilservicejobs]   # prefix match on freehire `source`
+    groups:                       # one search each, so a big region can't crowd out the others
+      - {name: india, countries: [IN]}
+      - {name: europe, regions: [eu, uk]}
+      - {name: middle-east, countries: [AE, SA, QA, BH, KW, OM]}
+      - {name: apac, countries: [AU, NZ, SG, JP, HK, MY]}
+      - {name: north-america, countries: [US, CA]}
+      - {name: remote-worldwide, regions: [global], work_mode: remote}
+
+  # JobSpy: scrapes public pages without login (user accepted the ToS trade-off 2026-10-26).
+  - name: linkedin
+    type: jobspy
+    site: linkedin
+    enabled: true
+    hours_old: 36
+    max_age_hours: 36
+    results_wanted: 100
+    sleep_sec: 8                  # LinkedIn 429s on bursts; keep it slow
+    search_terms_by_slot:         # LinkedIn pauses 3-7 s per page: each term runs once a day
+      morning: ["data engineer", "data platform engineer", "analytics engineer"]
+      evening: ["big data engineer", "ETL developer", "data infrastructure engineer"]
+    searches:
+      - {location: "Mumbai, India", country: IN}
+      - {location: "Bengaluru, India", country: IN}
+      - {location: "Pune, India", country: IN}
+      - {location: "Hyderabad, India", country: IN}
+      - {location: "Gurugram, India", country: IN}
+      - {location: "Chennai, India", country: IN}
+      - {location: "Germany", country: DE}
+      - {location: "Netherlands", country: NL}
+      - {location: "United Kingdom", country: GB}
+      - {location: "Ireland", country: IE}
+      - {location: "Switzerland", country: CH}
+      - {location: "Austria", country: AT}
+      - {location: "Sweden", country: SE}
+      - {location: "Denmark", country: DK}
+      - {location: "Portugal", country: PT}
+      - {location: "Spain", country: ES}
+      - {location: "Poland", country: PL}
+      - {location: "Belgium", country: BE}
+      - {location: "United Arab Emirates", country: AE}
+      - {location: "Saudi Arabia", country: SA}
+      - {location: "Qatar", country: QA}
+      - {location: "Australia", country: AU}
+      - {location: "Singapore", country: SG}
+      - {location: "Japan", country: JP}
+      - {location: "United States", country: US}
+      - {location: "Canada", country: CA}
+
+  - name: indeed
+    type: jobspy
+    site: indeed
+    enabled: true
+    hours_old: 72                 # Phase 1: Indeed returns ~nothing for shorter windows
+    max_age_hours: 72
+    results_wanted: 100
+    sleep_sec: 2
+    search_terms: ["data engineer", "data platform engineer", "analytics engineer", "big data engineer", "ETL developer", "data infrastructure engineer"]
+    searches:
+      - {country_indeed: india, country: IN}
+      - {country_indeed: germany, country: DE}
+      - {country_indeed: netherlands, country: NL}
+      - {country_indeed: uk, country: GB}
+      - {country_indeed: ireland, country: IE}
+      - {country_indeed: switzerland, country: CH}
+      - {country_indeed: austria, country: AT}
+      - {country_indeed: sweden, country: SE}
+      - {country_indeed: denmark, country: DK}
+      - {country_indeed: portugal, country: PT}
+      - {country_indeed: spain, country: ES}
+      - {country_indeed: poland, country: PL}
+      - {country_indeed: belgium, country: BE}
+      - {country_indeed: united arab emirates, country: AE}
+      - {country_indeed: saudi arabia, country: SA}
+      - {country_indeed: qatar, country: QA}
+      - {country_indeed: australia, country: AU}
+      - {country_indeed: singapore, country: SG}
+      - {country_indeed: new zealand, country: NZ}
+      - {country_indeed: usa, country: US}
+      - {country_indeed: canada, country: CA}
+
+  - name: naukri
+    type: jobspy
+    site: naukri
+    enabled: true
+    fetch_description: true       # cards carry no JD; JobSpy fetches each job page
+    hours_old: 36
+    max_age_hours: 36
+    results_wanted: 100
+    sleep_sec: 3
+    search_terms: ["data engineer", "big data engineer", "ETL developer", "data platform engineer"]
+    searches:
+      - {location: Mumbai, country: IN}
+      - {location: Bengaluru, country: IN}
+      - {location: Pune, country: IN}
+      - {location: Hyderabad, country: IN}
+      - {location: Gurugram, country: IN}
+      - {location: Noida, country: IN}
+      - {location: Delhi, country: IN}
+      - {location: Chennai, country: IN}
+
+  - name: bayt
+    type: jobspy
+    site: bayt
+    enabled: false                # 0 jobs in 7 of 11 runs: 403s from GitHub's servers
+    hours_old: 72
+    max_age_hours: 72
+    results_wanted: 50
+    sleep_sec: 3
+    search_terms: ["data engineer"]
+    searches:
+      - {location: United Arab Emirates, country: AE}
+      - {location: Saudi Arabia, country: SA}
+      - {location: Qatar, country: QA}
+      - {location: Bahrain, country: BH}
+      - {location: Kuwait, country: KW}
+      - {location: Oman, country: OM}
+
+  # Added 2026-11-08 from career-ops' board list, each tested live first (docs/repo-inventory.md).
+  - name: wttj                    # Welcome to the Jungle: EU tech (mostly FR); English postings only
+    type: wttj
+    enabled: true
+    max_age_hours: 48
+    languages: [en]
+    search_terms: ["data engineer", "data platform engineer", "analytics engineer", "big data engineer"]
+  - name: mycareersfuture         # Singapore's national job bank (official API, full JDs)
+    type: mycareersfuture
+    enabled: true
+    max_age_hours: 48
+    max_pages: 2
+    search_terms: ["data engineer", "data platform engineer", "big data engineer"]
+  - name: hn-whoishiring          # Hacker News monthly "Who is hiring?" thread
+    type: hn
+    enabled: true
+    max_age_hours: 72
+  # Not added: SEEK (robots.txt forbids job pages and the search API), GermanTechJobs (feed now
+  # behind sign-up), Landing.jobs / The Hub / JustJoin.it (few relevant jobs or unreachable),
+  # direct Keka/Zoho/Darwinbox polling (~1 data-eng job a day across ~640 boards).
+  - name: arbeitnow-eu
+    type: arbeitnow
+    enabled: true
+    url: https://www.arbeitnow.com/api/job-board-api
+    params: { visa_sponsorship: true }
+    max_pages: 3
+    max_age_hours: 72
+  - name: arbeitnow-uk
+    type: arbeitnow
+    enabled: true
+    url: https://www.arbeitnow.co.uk/api/job-board-api
+    params: { visa_sponsorship: true }
+    max_pages: 2
+    max_age_hours: 72
+  # Direct ATS polling: freehire covers these boards (92% of data roles, ~2h lag in Phase 1), so
+  # direct polling is a fallback. Qonto moved Lever -> Ashby (no Lever board any more).
+  - name: qonto-lever
+    type: lever
+    enabled: false
+    company: qonto
+  - name: example-greenhouse
+    type: greenhouse
+    enabled: false
+    token: examplecompany
+
+# --- LLM (Claude Pro via Claude Code; NEVER --bare; ANTHROPIC_API_KEY must be unset) ---
+llm:
+  command: claude               # resolved on PATH
+  extra_args: ["-p"]            # print/non-interactive. --output-format json added per structured call.
+  model: null                   # fallback for any stage not listed in `models`
+  models:                       # per stage (2026-11-08): cheap scoring, strong writing
+    score: haiku
+    research_letter: sonnet
+    resume: sonnet
+  lean: true                    # one-line system prompt + only the tools a stage needs (~41k -> ~1k tokens/call)
+  timeout_sec: 600              # research calls use web search; give them room
+  tier1_batch_size: 30          # score this many jobs per call (batch! not one call per job)
+  tier1_max_jobs: 250           # per run, freshest first; the rest carry over to the next run
+  research_tools: [WebSearch, WebFetch]   # allowed in the research call (print mode denies others)
+  dry_run: false                # true = skip real calls, emit stub output (for offline testing)
+
+# --- EMAIL (digest + application pack). Password from env JOBHUNT_SMTP_PASS, never in file. ---
+email:
+  enabled: true
+  dry_run: false                # true = never send; false = send when JOBHUNT_SMTP_PASS is set
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  smtp_user: null               # set in config/private.yaml (the account that owns the App Password)
+  from_addr: null
+  to_addr: null
+  subject_prefix: "[JobHunt]"
+  read_replies: true            # read your reply (codes you applied to) over IMAP
+  send_at: "08:00"              # IST; the scheduled morning run waits until then before sending
+  imap_host: imap.gmail.com

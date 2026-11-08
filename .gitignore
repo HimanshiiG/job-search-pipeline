@@ -1,0 +1,19 @@
+# secrets — never commit (SMTP password, vault key, API keys live in .env / GitHub secrets)
+.env
+*.key
+
+# private files: kept only in the encrypted vault (vault/private.bin, see scripts/vault.py)
+profiles/
+config/private.yaml
+CLAUDE.md
+pilot/
+
+# runtime artifacts (state is encrypted on the jobhunt-state branch)
+output/
+state/
+sample/*.json
+__pycache__/
+*.pyc
+
+# local-only dry-run config
+config/config.dryrun.yaml

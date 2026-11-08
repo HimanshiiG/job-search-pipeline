@@ -1,0 +1,91 @@
+# Employers known to hire internationally with relocation. Jobs from these get the
+# "relocation-list" signal (shown in the digest, rewarded in tier-1 scoring).
+# Source: github.com/AndrewStetsenko/tech-jobs-with-relocation (CC0), snapshot 2026-10-26.
+# One company per line; matched case-insensitively after dropping legal suffixes. Add freely.
+Applike Group
+BandLab
+Betsson Group
+BlaBlaCar
+Blinkist
+Bol.com
+Byborg Enterprises
+Catawiki
+CloudLinux
+Coolblue
+Creative Fabrica
+Cube Dev
+Elements
+ePages
+EPAM
+EVBox
+Exness
+FINN
+Flow Traders
+foodspring
+FxPro
+Gnosis
+Greentube
+HENNGE
+Highsnobiety
+HomeToGo
+HousingAnywhere
+Intropic
+JOIN
+Journi
+Jumbo
+Just Eat Takeaway.com
+Lemonade
+Lightspeed
+LY Corporation
+LOOP
+Manychat
+Mercari
+Mollie
+Monzo
+movingimage
+Mujin
+Multiverse Computing
+NavVis
+Neocom
+Oda
+OJ Electronics
+Oxa
+PayPay
+Payrails
+PhotoRoom
+Picnic
+Procreate
+QuadSAT
+Queue-it
+Reaktor
+Scout24
+Seldon
+Shape
+SimScale
+Smallpdf
+Smartly.io
+SmartNews
+Solvians
+SoundCloud
+straiv
+Stream
+Sumo Digital
+Swisscom
+Tactile Games
+Talkwalker
+The LEGO Group
+Tractable
+Uphold
+Vimcar
+Volkswagen Digital Solutions
+Wallapop
+Wayve
+Welltech
+WiseTech Global
+Wise
+WorldQuant
+Xeneta
+Xovis
+Ziegert Group
+Zivid
+Zound Industries

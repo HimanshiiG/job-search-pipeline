@@ -1,0 +1,4 @@
+PyYAML>=6.0
+requests>=2.31
+python-jobspy>=1.4
+cryptography>=42
