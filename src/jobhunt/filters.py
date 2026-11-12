@@ -146,8 +146,13 @@ def evaluate(job: dict, profile: dict) -> list[str]:
         fails.append("JD-NON-EN")
 
     # seniority by title
+    # Dual-level titles keep their reachable end (Sonnet audit 2026-11-12): "Senior/Staff Data
+    # Engineer", "Senior / Principal ...", and entry staff grades like "Staff Engineer I" go to scoring.
     titles = [t.lower() for t in hf.get("drop_senior_titles", [])]
-    if any(re.search(r"\b" + re.escape(t) + r"\b", title.lower()) for t in titles):
+    dual_level = re.search(r"\bsenior\b[^/]{0,40}/[^/]{0,10}\b(staff|principal|lead)\b|"
+                           r"\b(staff|principal|lead)\b[^/]{0,40}/[^/]{0,10}\bsenior\b|"
+                           r"\bstaff (software |data )?engineer (i|1)\b", title, re.I)
+    if not dual_level and any(re.search(r"\b" + re.escape(t) + r"\b", title.lower()) for t in titles):
         fails.append("SR-TITLE")
 
     # years of experience

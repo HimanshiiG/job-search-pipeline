@@ -6,7 +6,7 @@
 run:
   profile: candidate             # which profiles/<id>.yaml to use (set in config/private.yaml)
   docs_threshold: 60             # documents (resume; + letter & outreach outside India) for every match >= this
-  docs_max_per_run: 80           # safety cap per run; the rest wait for the next run
+  docs_max_per_run: 15           # interim (2026-11-12, 54% of weekly limit used): raise once usage is measured
   sponsor_registers: true        # UK + NL official sponsor registers for the visa label (weekly refresh)
   apply_threshold: 50            # tier-1 match % needed to make the newsletter
   jd_fetch:                      # card-only jobs (LinkedIn) get their JD fetched before scoring
@@ -203,7 +203,7 @@ llm:
   lean: true                    # one-line system prompt + only the tools a stage needs (~41k -> ~1k tokens/call)
   timeout_sec: 600              # research calls use web search; give them room
   tier1_batch_size: 30          # score this many jobs per call (batch! not one call per job)
-  tier1_max_jobs: 250           # per run, freshest first; the rest carry over to the next run
+  tier1_max_jobs: 600           # per run; set so it never binds (Haiku scores every job that passes the rules)
   research_tools: [WebSearch, WebFetch]   # allowed in the research call (print mode denies others)
   dry_run: false                # true = skip real calls, emit stub output (for offline testing)
 
