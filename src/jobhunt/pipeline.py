@@ -18,6 +18,21 @@ from datetime import timedelta
 from . import fetch, dedupe, filters, stages, report, newsletter, replies, visa, documents
 from .llm import LLM, usage_summary
 from . import notify
+from html import escape
+
+
+def claude_alarm(since_runs: list[dict], newsletter_errors: list[str]) -> str | None:
+    """A loud message when Claude failed: a run since the last letter scored nothing because every
+    call failed, or the newsletter run's own calls all failed. None when all is well."""
+    for r in reversed(since_runs):
+        u = (r.get("usage") or {}).get("score") or {}
+        if r.get("passed") and not r.get("scored") and u.get("calls") and u.get("failed") == u.get("calls"):
+            return (f"Claude could not score any of the {r['passed']} jobs that passed the filters "
+                    f"(all {u['calls']} calls failed). Reason: {r.get('llm_error') or 'unknown'}. "
+                    "Usually the CLAUDE_CODE_OAUTH_TOKEN secret is missing or wrong, or the plan's limit is used up.")
+    if newsletter_errors:
+        return f"Claude failed while preparing this letter: {newsletter_errors[-1]}"
+    return None
 
 MODES = ("fetch-only", "score", "newsletter", "full")
 
@@ -141,7 +156,7 @@ def score(cfg: Config, offline_file: str | None = None, fetch_only: bool = False
     dedupe.save_state(cfg.state_path(), state, dropped + scored)
     _log_run(cfg, {"at": _now(), "fetched": len(jobs), "passed": len(passed), "scored": len(scored),
                    "matched": matched, "deferred": len(deferred), "health": health, "docs": docstats,
-                   "usage": _jsonable(usage)})
+                   "usage": _jsonable(usage), "llm_error": llm.errors[-1] if llm.errors else None})
     return {"passed": len(passed), "scored": len(scored), "matched": matched, "deferred": len(deferred)}
 
 
@@ -183,6 +198,12 @@ def send_newsletter(cfg: Config) -> dict:
     usage = _merge_usage([r.get("usage") or {} for r in since] + [_jsonable(usage_summary(llm.calls))])
     subject, text, html = newsletter.build(cfg.profile, top, rest, awaiting, due, docs, stats, health,
                                            usage=usage, reply_result=reply_result)
+    alarm = claude_alarm(since, llm.errors)
+    if alarm:   # never send a quiet empty letter when Claude itself failed
+        print(f"  ! {alarm}")
+        subject = "CLAUDE FAILED: " + subject
+        text = f"*** {alarm} ***\n\n" + text
+        html = f"<p style='background:#fdd;padding:8px'><b>{escape(alarm)}</b></p>" + html
     _wait_until_send_time(cfg)
     msgid = make_msgid(domain="jobhunt.local")
     try:

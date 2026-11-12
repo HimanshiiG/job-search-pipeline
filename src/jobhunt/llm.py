@@ -33,6 +33,7 @@ class LLM:
             "You help a data engineer with their job search: you screen postings, research companies "
             "and draft application documents. Follow the user's instructions and output format exactly.")
         self.calls: list[dict] = []                    # one usage record per call
+        self.errors: list[str] = []                    # the reason text of each failed call
 
     def _env(self) -> dict:
         env = dict(os.environ)
@@ -70,12 +71,13 @@ class LLM:
         envelope = _parse_envelope(proc.stdout)
         self._record(stage, model, t0, envelope,
                      error=None if proc.returncode == 0 else f"exit {proc.returncode}")
-        if proc.returncode != 0:
-            raise LLMError(f"claude -p exited {proc.returncode}: {(proc.stderr or proc.stdout)[:500]}")
+        if proc.returncode != 0 or (envelope or {}).get("is_error"):
+            # the reason is in the envelope's `result` (e.g. "Invalid API key", "usage limit reached")
+            reason = str((envelope or {}).get("result") or proc.stderr or proc.stdout or "").strip()[:300]
+            self.errors.append(reason or f"exit {proc.returncode}")
+            raise LLMError(f"claude -p failed (exit {proc.returncode}): {reason}")
         if envelope is None:
             return proc.stdout.strip()
-        if envelope.get("is_error"):
-            raise LLMError(f"claude -p reported an error: {str(envelope.get('result'))[:500]}")
         return str(envelope.get("result") or "").strip()
 
     def run_json(self, prompt: str, stage: str | None = None):

@@ -222,3 +222,14 @@ class LLMWrapper(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClaudeAlarm(unittest.TestCase):
+    def test_alarm_when_every_score_call_failed(self):
+        from jobhunt.pipeline import claude_alarm
+        bad = {"passed": 935, "scored": 0, "usage": {"score": {"calls": 9, "failed": 9}},
+               "llm_error": "Invalid API key"}
+        ok = {"passed": 900, "scored": 250, "usage": {"score": {"calls": 9, "failed": 0}}}
+        self.assertIn("Invalid API key", claude_alarm([bad], []))
+        self.assertIsNone(claude_alarm([ok], []))
+        self.assertIn("limit", claude_alarm([ok], ["usage limit reached"]))
