@@ -58,7 +58,11 @@ The posting's keywords the candidate genuinely has (use these exact terms): {{AT
   no notes); push unrelated ones down.
 - **Employer confidentiality (Rule #4)**: structural wording only, no internal figures,
   amounts or counterparties (see the profile's `confidentiality`).
-- Keep it one to two pages, newest role first. Keep contact details and links from the profile.
+- **Keep the base resume's exact Markdown structure** (it is converted to LaTeX/PDF by code):
+  `# Name`, then headline, contact line and location line as plain lines; `## Section` headings;
+  skills as `- **Group:** items`; each role as `### Company | Title | Location | Dates`; bullets
+  as `- ` lines; education as `School | Degree | Location | Years`. No other Markdown.
+- Keep it to one page (about 500-550 words), newest role first. Keep contact details and links from the profile.
   No em-dashes, no clichés ("passionate", "results-driven", "team player").
 
 ## Output: exactly these sections, with these exact headings

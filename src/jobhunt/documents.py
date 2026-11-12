@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 
-from . import stages, factcheck, fetch, visa, ats
+from . import stages, factcheck, fetch, visa, ats, latex
 from .config import ROOT
 from .llm import LLM, fill
 
@@ -136,7 +136,10 @@ def build(cfg, llm: LLM, e: dict, connections: list[dict]) -> dict:
     parts += ["", "Search LinkedIn yourself:", people_links(e), ""]
     if res["diff"] or rl["reviewer"]:
         parts += ["## Notes for you (not part of the application)", res["diff"], rl["reviewer"], ""]
-    return {"file": f"{e.get('code')}_{_slug(e['company'])}.md", "content": "\n".join(p for p in parts if p is not None),
+    base_name = f"{e.get('code')}_{_slug(e['company'])}"
+    tex = latex.md_to_tex(res["resume"]) if res["resume"] else ""   # for Overleaf -> PDF
+    return {"file": f"{base_name}.md", "content": "\n".join(p for p in parts if p is not None),
+            "tex_file": f"{base_name}_resume.tex" if tex else None, "tex": tex,
             "warnings": warnings, "letter": bool(rl["letter"]), "contact": bool(rl["outreach"]) or bool(known),
             "research": rl["research"], "made_at": datetime.now(timezone.utc).isoformat()}
 

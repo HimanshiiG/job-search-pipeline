@@ -35,7 +35,8 @@ def deliver(email_cfg: dict, subject: str, text: str, html: str,
     msg.set_content(text)
     msg.add_alternative(html, subtype="html")
     for name, content in attachments:
-        msg.add_attachment(content.encode("utf-8"), maintype="text", subtype="markdown", filename=name)
+        subtype = "x-tex" if name.endswith(".tex") else "markdown"
+        msg.add_attachment(content.encode("utf-8"), maintype="text", subtype=subtype, filename=name)
 
     ctx = ssl.create_default_context()
     with smtplib.SMTP(email_cfg["smtp_host"], int(email_cfg["smtp_port"])) as s:

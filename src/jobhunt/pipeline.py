@@ -162,7 +162,11 @@ def send_newsletter(cfg: Config) -> dict:
     print(f"[5] newsletter: {len(top)} applications with documents, {len(rest)} more matches, "
           f"{len(awaiting)} awaiting reply, {len(due)} follow-ups due")
     docs = {e["hash"]: [e["doc"]["file"]] for e in top}
-    attachments = [(e["doc"]["file"], e["doc"]["content"]) for e in top]
+    attachments = []
+    for e in top:   # the application notes (.md) + the tailored resume as LaTeX (open in Overleaf -> PDF)
+        attachments.append((e["doc"]["file"], e["doc"]["content"]))
+        if e["doc"].get("tex"):
+            attachments.append((e["doc"]["tex_file"], e["doc"]["tex"]))
     try:  # weekly reusable answers for application forms
         kit = documents.answers_kit(cfg, llm, cfg.answers_kit_path())
         if kit:
