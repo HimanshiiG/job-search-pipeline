@@ -140,12 +140,15 @@ def select_base_resume(profile: dict, job: dict) -> tuple[str, str]:
 
 
 # ---------- TAILOR ----------
-def tailor_resume(llm: LLM, profile: dict, base_resume: str, research_notes: str, job: dict) -> dict:
+def tailor_resume(llm: LLM, profile: dict, base_resume: str, research_notes: str, job: dict,
+                  location_line: str = "", ats_terms: list[str] | None = None) -> dict:
     """{resume, diff, recruiter_note}."""
     tmpl = _prompt("resume_tailor.md")
     prompt = fill(tmpl, PROFILE_FULL=json.dumps(profile, ensure_ascii=False),
                   BASE_RESUME=base_resume,
                   RESEARCH_NOTES=research_notes or "(no research for this job: tailor from the JD)",
+                  LOCATION_LINE=location_line or "Mumbai, India",
+                  ATS_TERMS=", ".join(ats_terms or []) or "(none beyond what the base resume already says)",
                   JOB=json.dumps(_job_brief(job, 4000), ensure_ascii=False))
     p = sections(llm.run(prompt, stage="resume"), ("RESUME", "DIFF NOTE", "RECRUITER NOTE"), main="RESUME")
     return {"resume": p["RESUME"], "diff": p["DIFF NOTE"], "recruiter_note": p["RECRUITER NOTE"]}

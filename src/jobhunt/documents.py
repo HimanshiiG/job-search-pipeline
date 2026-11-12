@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 
-from . import stages, factcheck, fetch, visa
+from . import stages, factcheck, fetch, visa, ats
 from .config import ROOT
 from .llm import LLM, fill
 
@@ -57,6 +57,27 @@ def warm_intros(company: str, connections: list[dict], limit: int = 3) -> list[s
     return out[:limit]
 
 
+# ---------- location line (the PDF review: "remote within India" sank every application abroad) ----------
+def location_line(e: dict, profile: dict) -> str:
+    """Per-job line under the name. profile.location_lines: {home, eu_blue_card, abroad}, with
+    {country} filled in. Never says 'India only' on a job outside India."""
+    lines = profile.get("location_lines") or {}
+    home = {c.upper() for c in profile.get("eligibility", {}).get("no_sponsorship_needed_in", [])}
+    country = (e.get("country") or "").upper()
+    names = {"DE": "Germany", "NL": "the Netherlands", "GB": "the UK", "IE": "Ireland", "AE": "the UAE",
+             "SG": "Singapore", "AU": "Australia", "US": "the US", "CA": "Canada", "CH": "Switzerland"}
+    where = names.get(country, e.get("location") or "the role's location")
+    if country in home:
+        key = "home"
+    elif country in visa.BLUE_CARD:
+        key = "eu_blue_card"
+    else:
+        key = "abroad"
+    default = {"home": "Mumbai, India", "eu_blue_card": "Mumbai, India | Open to relocation to {country} | EU Blue Card eligible",
+               "abroad": "Mumbai, India | Open to relocation to {country}"}[key]
+    return (lines.get(key) or default).replace("{country}", where)
+
+
 # ---------- one job ----------
 def _sources_text(profile: dict, base_resume: str) -> str:
     return base_resume + "\n" + json.dumps(profile, ensure_ascii=False)
@@ -72,11 +93,12 @@ def build(cfg, llm: LLM, e: dict, connections: list[dict]) -> dict:
     if letter_needed:
         rl = stages.research_and_letter(llm, profile, e, tools=cfg.llm.get("research_tools", ["WebSearch", "WebFetch"]))
     label, base_resume = stages.select_base_resume(profile, e)
-    res = stages.tailor_resume(llm, profile, base_resume, rl["research"], e) if base_resume else {
-        "resume": "", "diff": "", "recruiter_note": ""}
-
     sources = _sources_text(profile, base_resume)
     gaps = profile.get("skills_gaps") or []
+    res = stages.tailor_resume(llm, profile, base_resume, rl["research"], e,
+                               location_line=location_line(e, profile),
+                               ats_terms=ats.terms_you_have(e.get("description") or "", sources, gaps)) if base_resume else {
+        "resume": "", "diff": "", "recruiter_note": ""}
     confidential = (profile.get("confidentiality") or {}).get("never_mention") or []
     warnings = [f"resume: {w}" for w in factcheck.check(res["resume"], sources, gaps, "resume", confidential)]
     warnings += [f"letter: {w}" for w in factcheck.check(rl["letter"], sources, gaps, "letter", confidential)]
@@ -87,6 +109,10 @@ def build(cfg, llm: LLM, e: dict, connections: list[dict]) -> dict:
                         "but read the original posting yourself")
 
     known = warm_intros(e["company"], connections)
+    keyword_rows = ats.coverage(e.get("description") or "", res["resume"], sources, gaps)
+    if any(st == "add it" for _, st in keyword_rows):
+        warnings.append("keywords you have but the resume doesn't say: "
+                        + ", ".join(t for t, st in keyword_rows if st == "add it"))
     parts = [f"# {e['title']} — {e['company']}  [{e.get('code')}]",
              f"Match {e.get('score')}% · {e.get('location') or e.get('country')} · visa: "
              + {"sponsors": "sponsorship offered", "register": "employer on an official sponsor register",
@@ -96,6 +122,8 @@ def build(cfg, llm: LLM, e: dict, connections: list[dict]) -> dict:
     if warnings:
         parts += ["## ⚠ Check before sending"] + [f"- {w}" for w in warnings] + [""]
     parts += [f"## Resume (tailored from your {label or 'base'} resume)", res["resume"] or "(not generated)", ""]
+    if keyword_rows:
+        parts += [ats.table(keyword_rows), ""]
     if rl["letter"]:
         parts += ["## Cover letter", rl["letter"], ""]
     parts += ["## People to contact"]

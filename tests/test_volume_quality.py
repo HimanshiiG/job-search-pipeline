@@ -175,3 +175,30 @@ class Slots(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ATS(unittest.TestCase):
+    def test_coverage_statuses(self):
+        from jobhunt import ats
+        jd = "Python, SQL, Spark, Airflow, Kafka, change data capture, infrastructure as code, Terraform."
+        rows = dict(ats.coverage(jd, "Python, SQL, Apache Kafka", "Python SQL Kafka CDC Helm infrastructure as code",
+                                 ["Terraform", "Airflow", "PySpark"]))
+        self.assertEqual(rows["Python"], "covered")
+        self.assertEqual(rows["Change Data Capture (CDC)"], "add it")
+        self.assertEqual(rows["Infrastructure as Code"], "add it")   # IaC is not the Terraform gap
+        self.assertEqual(rows["Terraform"], "gap")
+        self.assertEqual(rows["Apache Airflow"], "gap")
+        self.assertIn("Change Data Capture (CDC)", ats.terms_you_have(jd, "Python CDC", ["Airflow"]))
+
+    def test_location_line_never_india_only_abroad(self):
+        prof = {**PROFILE, "location_lines": {"home": "Mumbai, India | Notice period: 60 days",
+                                              "eu_blue_card": "Mumbai, India | Open to relocation to {country} | EU Blue Card eligible",
+                                              "abroad": "Mumbai, India | Open to relocation to {country}"}}
+        self.assertEqual(documents.location_line({"country": "IN"}, prof), "Mumbai, India | Notice period: 60 days")
+        self.assertIn("Germany | EU Blue Card eligible", documents.location_line({"country": "DE"}, prof))
+        self.assertEqual(documents.location_line({"country": "GB"}, prof), "Mumbai, India | Open to relocation to the UK")
+        self.assertNotIn("India only", documents.location_line({"country": "US"}, prof))
+
+
+if __name__ == "__main__":
+    unittest.main()
