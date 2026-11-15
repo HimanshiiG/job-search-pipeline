@@ -32,7 +32,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    # Scheduled runs are skipped on these IST dates (space-separated YYYY-MM-DD). Manual runs always go.
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.g.outputs.skip }}
+    steps:
+      - id: g
+        env:
+          SKIP_DATES_IST: "2026-11-16"
+        run: |
+          today=$(TZ=Asia/Kolkata date +%F); skip=false
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            for d in $SKIP_DATES_IST; do [ "$d" = "$today" ] && skip=true; done
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"; echo "IST date $today, skip=$skip"
+
   run:
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 330
     env:
