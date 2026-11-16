@@ -40,7 +40,7 @@ jobs:
     steps:
       - id: g
         env:
-          SKIP_DATES_IST: "2026-11-16"
+          SKIP_DATES_IST: "2026-11-16 2026-11-18"
         run: |
           today=$(TZ=Asia/Kolkata date +%F); skip=false
           if [ "${{ github.event_name }}" = "schedule" ]; then
