@@ -40,7 +40,7 @@ jobs:
     steps:
       - id: g
         env:
-          SKIP_DATES_IST: "2026-11-17 2026-11-18 2026-11-19"
+          SKIP_DATES_IST: "2026-11-17 2026-11-18 2026-11-19 2026-11-20"
           CRON: ${{ github.event.schedule }}
         run: |
           # GitHub often starts scheduled runs hours late, so judge by the slot's SCHEDULED time,
