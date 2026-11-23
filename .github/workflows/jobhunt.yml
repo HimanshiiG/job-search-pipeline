@@ -40,13 +40,17 @@ jobs:
     steps:
       - id: g
         env:
-          SKIP_DATES_IST: "2026-11-17 2026-11-18 2026-11-19 2026-11-20"
+          # PAUSED=true skips EVERY scheduled run until set back to false. Manual runs still go.
+          PAUSED: "true"
+          SKIP_DATES_IST: "2026-11-17 2026-11-18 2026-11-19 2026-11-20 2026-11-23"
           CRON: ${{ github.event.schedule }}
         run: |
           # GitHub often starts scheduled runs hours late, so judge by the slot's SCHEDULED time,
           # not by when the run starts: the latest occurrence of this cron at or before now.
           skip=false; day=$(TZ=IST-5:30 date +%F)
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$PAUSED" = "true" ]; then
+            skip=true
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
             hm=$(echo "$CRON" | awk '{printf "%02d:%02d", $2, $1}')
             slot=$(date -u -d "today $hm" +%s); [ "$slot" -gt "$(date -u +%s)" ] && slot=$((slot - 86400))
             day=$(TZ=IST-5:30 date -d "@$slot" +%F)
