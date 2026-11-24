@@ -13,9 +13,11 @@
 name: jobhunt
 
 on:
-  schedule:
-    - cron: "0 23 * * *"     # 04:30 IST: fetch + score + documents, newsletter sent at 08:00 IST
-    - cron: "30 12 * * *"    # 18:00 IST: fetch + score + documents, nothing sent
+  # SCHEDULE OFF until the owner says otherwise. To turn it back on, uncomment these 3 lines
+  # and set PAUSED to "false" in the gate job below.
+  # schedule:
+  #   - cron: "0 23 * * *"     # 04:30 IST: fetch + score + documents, newsletter sent at 08:00 IST
+  #   - cron: "30 12 * * *"    # 18:00 IST: fetch + score + documents, nothing sent
   workflow_dispatch:
     inputs:
       mode:
